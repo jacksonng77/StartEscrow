@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<head>
+    <title>Purchase Manager</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+	<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' type='text/css'>
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.js"></script>
+</head>
+<body>
+    <div class="container">
+
+        <h1>Purchase Manager</h1>
+
+    	<div class="panel panel-default">
+        	<div class="panel-heading">Purchase Contract</div>
+        	<div class="panel-body">       
+            	<div class="form-group">
+        			<label for="contractAddress">Contract Address</label>
+        			<input id="contractAddress" class="form-control" type="text">
+            	</div>
+            	<div class="form-group">
+            		<button class="btn btn-primary" id="button">Get Contract</button>
+            	</div>
+        	</div>
+    	</div>
+
+        <div class="panel panel-default">
+        	<div class="panel-heading">Contract Details</div>
+        	<div class="panel-body"> 
+        		<div id="contractaddress"></div>
+        		<div id="itemvalue"></div>
+        		<div id="seller"></div>
+                <div id="buyer"></div>
+                <div id="state"></div>
+            
+        	</div>
+    	</div>    
+
+        <div class="panel panel-default" id="confirmpurchasediv">
+       		<div class="panel-heading">Action</div>
+       		<div class="panel-body">       
+           		<div class="form-group">
+       				<label for="price">Value in ETH (Twice of price)</label>
+       				<input id="price" class="form-control" type="text">
+           		</div>
+           		<div class="form-group">
+           			<button class="btn btn-primary" id="purchaseButton">Purchase</button>
+               		<img id="loader" src="https://loading.io/spinners/reload/index.ajax-syncing-loading-icon.svg">
+           		</div>
+       		</div>
+    	</div>
+
+        <div class="panel panel-default" id="confirmdeliverdiv">
+       		<div class="panel-heading">Action</div>
+       		<div class="panel-body">       
+           		<div class="form-group">
+           			<button class="btn btn-primary" id="deliverButton">Deliver</button>
+               		<img id="loaderdeliver" src="https://loading.io/spinners/reload/index.ajax-syncing-loading-icon.svg">
+           		</div>
+       		</div>
+    	</div>    
+    
+	</div>
+
+    <script>
+    	var currentContractAddress;
+    	var Purchase;
+    
+    	$(document).ready( function () {
+			$("#confirmpurchasediv").hide();
+        	$("#confirmdeliverdiv").hide();
+		} );
+    
+       if (typeof web3 !== 'undefined') {
+            web3 = new Web3(web3.currentProvider);
+        } else {
+            // set the provider you want from Web3.providers
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+        }
+	
+		web3.eth.defaultAccount = web3.eth.accounts[0];
+
+    	var PurchaseContract = web3.eth.contract(
+			[
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "seller",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": false,
+					"inputs": [],
+					"name": "abort",
+					"outputs": [],
+					"payable": false,
+					"stateMutability": "nonpayable",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "value",
+					"outputs": [
+						{
+							"name": "",
+							"type": "uint256"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "buyer",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": false,
+					"inputs": [],
+					"name": "confirmReceived",
+					"outputs": [],
+					"payable": false,
+					"stateMutability": "nonpayable",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "state",
+					"outputs": [
+						{
+							"name": "",
+							"type": "uint8"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": false,
+					"inputs": [],
+					"name": "confirmPurchase",
+					"outputs": [],
+					"payable": true,
+					"stateMutability": "payable",
+					"type": "function"
+				},
+				{
+					"inputs": [
+						{
+							"name": "contractSeller",
+							"type": "address"
+						}
+					],
+					"payable": true,
+					"stateMutability": "payable",
+					"type": "constructor"
+				},
+				{
+					"anonymous": false,
+					"inputs": [],
+					"name": "Aborted",
+					"type": "event"
+				},
+				{
+					"anonymous": false,
+					"inputs": [],
+					"name": "PurchaseConfirmed",
+					"type": "event"
+				},
+				{
+					"anonymous": false,
+					"inputs": [],
+					"name": "ItemReceived",
+					"type": "event"
+				}
+			]        
+        );
+    
+
+
+        $("#button").click(function() {
+        	currentContractAddress = $("#contractAddress").val();
+        	$("#contractaddress").html("Contract: " + $("#contractAddress").val());
+        	loadContractDetail($("#contractAddress").val());
+            
+        });
+
+     	var newConfirmPurchaseEvent;
+        $("#purchaseButton").click(function() {	
+           $("#loader").show();
+            Purchase.confirmPurchase({value: $("#price").val()*1000000000000000000, gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
+   				if(!error){
+       				console.log(JSON.stringify(result));
+					newConfirmPurchaseEvent = Purchase.PurchaseConfirmed();
+    				newConfirmPurchaseEvent.watch(function(error, result){
+            			if (!error)
+                		{
+                    		$("#loader").hide();
+                   			loadContractDetail(currentContractAddress);
+                		} 
+                    	else {
+                    		$("#loader").hide();
+                    		console.log(error);
+                		}
+        			});
+                }
+   				else{
+       				console.error(error);
+                }
+			});
+        });
+    
+     	var newConfirmDeliverEvent;
+        $("#deliverButton").click(function() {	
+           $("#loaderdeliver").show();
+            Purchase.confirmReceived({gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
+   				if(!error){
+       				console.log(JSON.stringify(result));
+					newConfirmDeliverEvent = Purchase.ItemReceived();
+    				newConfirmDeliverEvent.watch(function(error, result){
+            			if (!error)
+                		{
+                    		$("#loaderdeliver").hide();
+                   			loadContractDetail(currentContractAddress);
+                		} 
+                    	else {
+                    		$("#loaderdeliver").hide();
+                    		console.log(error);
+                		}
+        			});
+                }
+   				else{
+       				console.error(error);
+                }
+			});
+        });
+    
+    
+    function loadContractDetail(address){
+    	Purchase = PurchaseContract.at(address);
+    
+    	Purchase.value(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#itemvalue").html("Price: " + Number(result)/1000000000000000000);
+            }
+   			else{
+       			console.error(error);
+            }
+		})/18;
+    
+    	Purchase.seller(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#seller").html("Seller: " + result);
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+    
+        Purchase.buyer(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#buyer").html("Buyer: " + result);
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+    
+        Purchase.state(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+            	if (Number(result) === 0){
+                	$("#state").html('<span class="badge progress-bar-success">Created</span>');
+                	$("#confirmpurchasediv").show();
+        			$("#confirmdeliverdiv").hide();
+                }
+            	else if (Number(result) === 1){
+                	$("#state").html('<span class="badge progress-bar-info">Locked</span>');
+                	$("#confirmpurchasediv").hide();
+        			$("#confirmdeliverdiv").show();
+                }
+            	else {
+                	$("#state").html('<span class="badge progress-bar-danger">Inactive</span>');      
+                	$("#confirmpurchasediv").hide();
+        			$("#confirmdeliverdiv").hide();
+                }
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+    }
+    
+    </script>
+
+</body>
+</html>
