@@ -3,6 +3,10 @@ pragma solidity ^0.4.21;
 contract StartEscrow {
 	address[] public contracts;
     address public lastContractAddress;
+    
+    event newPurchaseContract(
+       address contractAddress
+    );
 
 	constructor()
 		public
@@ -27,6 +31,7 @@ contract StartEscrow {
 		Purchase c = (new Purchase).value(msg.value)(address(msg.sender));
 		contracts.push(c);
 		lastContractAddress = address(c);
+		emit newPurchaseContract(c);
 		return c;
 	}
 
@@ -46,7 +51,7 @@ contract Purchase {
 	address public buyer;
 	enum State { Created, Locked, Inactive }
 	State public state;
-
+    
 	// Ensure that `msg.value` is an even number.
 	// Division will truncate if it is an odd number.
 	// Check via multiplication that it wasn't an odd number.
