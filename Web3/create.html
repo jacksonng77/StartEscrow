@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<head>
+    <title>Escrow Service Manager</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+	<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' type='text/css'>
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.js"></script>
+</head>
+<body>
+    <div class="container">
+
+        <h1>Escrow Service Manager</h1>
+
+    	<div class="panel panel-default">
+        	<div class="panel-heading">New Purchase Contract</div>
+        	<div class="panel-body">       
+            	<div class="form-group">
+        			<label for="price">Value in ETH (Twice of price)</label>
+        			<input id="price" class="form-control" type="text">
+            	</div>
+            	<div class="form-group">
+            		<button class="btn btn-primary" id="button">Create Purchase Contract</button>
+                	<img id="loader" src="https://loading.io/spinners/reload/index.ajax-syncing-loading-icon.svg">
+            	</div>
+        	</div>
+    	</div>
+
+        <div class="panel panel-default">
+        	<div class="panel-heading">Contract Details</div>
+        	<div class="panel-body"> 
+        		<div id="contractaddress"></div>
+        	</div>
+    	</div>    
+
+    <script>
+    
+       if (typeof web3 !== 'undefined') {
+            web3 = new Web3(web3.currentProvider);
+        } else {
+            // set the provider you want from Web3.providers
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+        }
+	
+		web3.eth.defaultAccount = web3.eth.accounts[0];
+  
+        var StartEscrowContract = web3.eth.contract(
+        	[
+    			{
+        			"constant": false,
+			        "inputs": [],
+        			"name": "newPurchase",
+     			   	"outputs": [
+            			{
+                			"name": "newContract",
+                			"type": "address"
+            			}
+        			],
+        			"payable": true,
+        			"stateMutability": "payable",
+        			"type": "function"
+    			},
+    			{
+        			"anonymous": false,
+        			"inputs": [
+            			{
+                			"indexed": false,
+                			"name": "contractAddress",
+                			"type": "address"
+            			}
+        			],
+					"name": "newPurchaseContract",
+					"type": "event"
+				},
+				{
+					"inputs": [],
+					"payable": false,
+					"stateMutability": "nonpayable",
+					"type": "constructor"
+				},
+				{
+					"constant": true,
+					"inputs": [
+						{
+							"name": "",
+							"type": "uint256"
+						}
+					],
+					"name": "contracts",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "getContractCount",
+					"outputs": [
+						{
+							"name": "contractCount",
+							"type": "uint256"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "lastContractAddress",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [
+						{
+							"name": "pos",
+							"type": "uint256"
+						}
+					],
+					"name": "seePurchase",
+					"outputs": [
+						{
+							"name": "contractAddress",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				}
+			]
+        );
+
+        var StartEscrow = StartEscrowContract.at('0x660DA9eCd262170AD00a2702103074EfA9aD0103');
+        console.log(StartEscrow);
+    
+    	var newPurchaseContractEvent = StartEscrow.newPurchaseContract();
+    	newPurchaseContractEvent.watch(function(error, result){
+            if (!error)
+                {
+                    $("#loader").hide();
+                    $("#contractaddress").html("Contract: " + result.args.contractAddress);
+                	var t = $("#contractTable").DataTable();
+                    t.row.add([result.args.contractAddress]).draw(false);
+                } else {
+                    $("#loader").hide();
+                    console.log(error);
+                }
+        });
+
+        $("#button").click(function() {
+        	
+           $("#loader").show();
+            StartEscrow.newPurchase({value: $("#price").val()*1000000000000000000, gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
+   				if(!error)
+       				console.log(JSON.stringify(result));
+   				else
+       				console.error(error);
+			});
+        });
+
+    </script>
+
+</body>
+</html>
