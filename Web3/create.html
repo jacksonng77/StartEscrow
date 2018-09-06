@@ -157,8 +157,6 @@
                 {
                     $("#loader").hide();
                     $("#contractaddress").html("Contract: " + result.args.contractAddress);
-                	var t = $("#contractTable").DataTable();
-                    t.row.add([result.args.contractAddress]).draw(false);
                 } else {
                     $("#loader").hide();
                     console.log(error);
