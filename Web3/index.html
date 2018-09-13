@@ -6,7 +6,13 @@
 	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
 	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+	<script src="https://unpkg.com/ipfs-api/dist/index.js"></script>
 	<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.js"></script>
+	<style>
+		input[type="file"] {
+    		display: none;
+		}
+	</style>
 </head>
 <body>
     <div class="container">
@@ -18,10 +24,13 @@
         	<div class="panel-body">       
             	<div class="form-group">
         			<label for="price">Value in ETH (Twice of price)</label>
-        			<input id="price" class="form-control" type="text">
+        			<input id="price" class="form-control" type="text" value="2">
             	</div>
             	<div class="form-group">
-            		<button class="btn btn-primary" id="button">Create Purchase Contract</button>
+            	    <label for="file-upload" class="btn btn-primary">
+    					<i class="fa fa-cloud-upload"></i> Select Image
+					</label>
+                	<input id="file-upload" type="file"/>
                 	<img id="loader" src="https://loading.io/spinners/reload/index.ajax-syncing-loading-icon.svg">
             	</div>
         	</div>
@@ -34,8 +43,9 @@
         		<div id="itemvalue"></div>
         		<div id="seller"></div>
                 <div id="buyer"></div>
+                <div id="ipfshash"></div>
+                <div id="ipfsimage"></div>
                 <div id="state"></div>
-            
         	</div>
     	</div>    
     
@@ -85,8 +95,15 @@
             web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
         }
 	
+	    ipfs = new window.IpfsApi('ipfs.infura.io', '5001', { protocol: 'https' });
+    	ipfs.id(function(err, res) {
+ 			if (err) throw err
+ 				console.log("Connected to IPFS node!", res.id, res.agentVersion, res.protocolVersion);
+ 		});
 		web3.eth.defaultAccount = web3.eth.accounts[0];
-
+		var Buffer = window.IpfsApi().Buffer;
+		
+		web3.eth.defaultAccount = web3.eth.accounts[0];
     	var PurchaseContract = web3.eth.contract(
 			[
 				{
@@ -164,6 +181,20 @@
 					"type": "function"
 				},
 				{
+					"constant": true,
+					"inputs": [],
+					"name": "ipfsHash",
+					"outputs": [
+						{
+							"name": "",
+							"type": "string"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
 					"constant": false,
 					"inputs": [],
 					"name": "confirmPurchase",
@@ -177,6 +208,10 @@
 						{
 							"name": "contractSeller",
 							"type": "address"
+						},
+						{
+							"name": "contractHash",
+							"type": "string"
 						}
 					],
 					"payable": true,
@@ -201,34 +236,39 @@
 					"name": "ItemReceived",
 					"type": "event"
 				}
-			]        
+			]      
         );
     
         var StartEscrowContract = web3.eth.contract(
         	[
-    			{
-        			"constant": false,
-			        "inputs": [],
-        			"name": "newPurchase",
-     			   	"outputs": [
-            			{
-                			"name": "newContract",
-                			"type": "address"
-            			}
-        			],
-        			"payable": true,
-        			"stateMutability": "payable",
-        			"type": "function"
-    			},
-    			{
-        			"anonymous": false,
-        			"inputs": [
-            			{
-                			"indexed": false,
-                			"name": "contractAddress",
-                			"type": "address"
-            			}
-        			],
+				{
+					"constant": false,
+					"inputs": [
+						{
+							"name": "contractHash",
+							"type": "string"
+						}
+					],
+					"name": "newPurchase",
+					"outputs": [
+						{
+							"name": "newContract",
+							"type": "address"
+						}
+					],
+					"payable": true,
+					"stateMutability": "payable",
+					"type": "function"
+				},
+				{
+					"anonymous": false,
+					"inputs": [
+						{
+							"indexed": false,
+							"name": "contractAddress",
+							"type": "address"
+						}
+					],
 					"name": "newPurchaseContract",
 					"type": "event"
 				},
@@ -306,8 +346,7 @@
 				}
 			]
         );
-
-        var StartEscrow = StartEscrowContract.at('0x660DA9eCd262170AD00a2702103074EfA9aD0103');
+        var StartEscrow = StartEscrowContract.at('0x05525d0692794ee5a19fa8b259f1100358ffc882');
         console.log(StartEscrow);
     
     	//retrieve all the contracts from the blockchain first
@@ -333,7 +372,6 @@
 				console.error(error);
             }
 		}); 
-
     	var newPurchaseContractEvent = StartEscrow.newPurchaseContract();
     	newPurchaseContractEvent.watch(function(error, result){
             if (!error)
@@ -343,23 +381,48 @@
                 	loadContractDetail(result.args.contractAddress);
                 	var t = $("#contractTable").DataTable();
                     t.row.add([result.args.contractAddress]).draw(false);
+                    
+                    ipfs.pin.add(ipfsHash, function (err) {
+                    	if (err){
+							console.log("cannot pin");
+                        }
+                    	else{
+                        	console.log("pin ok");
+                        }
+                    });
+                    
                 } else {
                     $("#loader").hide();
                     console.log(error);
                 }
         });
-
-        $("#button").click(function() {
+        
+        $("#file-upload").change(function() {
         	
-           $("#loader").show();
-            StartEscrow.newPurchase({value: $("#price").val()*1000000000000000000, gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
-   				if(!error)
-       				console.log(JSON.stringify(result));
-   				else
-       				console.error(error);
-			});
+            $("#loader").show();
+           
+            var reader = new FileReader();
+  			reader.onload = function() {
+                mybuffer = Buffer.from(this.result);
+            	ipfs.files.add(mybuffer, function(err, result){
+                	if (err) {
+    					console.log("Error");
+  					} 
+                	else {
+                    	ipfsHash = result[0].hash;
+                        StartEscrow.newPurchase(ipfsHash, {value: $("#price").val()*1000000000000000000, gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
+       				        if(!error){
+           				        console.log(JSON.stringify(result));
+       				        }
+       				        else{
+           				        console.error(error);
+       				        }
+			            });
+  					}
+                });
+			}
+			reader.readAsArrayBuffer(this.files[0]);
         });
-
     
     function loadContractDetail(address){
     	var Purchase = PurchaseContract.at(address);
@@ -388,6 +451,17 @@
    			if(!error){
             	console.log(JSON.stringify(result));
        			$("#buyer").html("Buyer: " + result);
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+
+        Purchase.ipfsHash(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#ipfshash").html("IPFS Hash: " + result);
+       			$("#ipfsimage").html("<img src=https://gateway.ipfs.io/ipfs/" + result + " width='400'>");
             }
    			else{
        			console.error(error);
